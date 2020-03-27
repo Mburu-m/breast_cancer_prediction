@@ -33,12 +33,12 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 # ***Data Set***
 
 
-In this tutorial I'm going to predict whether a breast cancer tumor is benign or malignant. Using [Wiscosin breast cancer data set](https://www.kaggle.com/uciml/breast-cancer-wisconsin-data)  available on Kaggle. The 30 predictors are divided into three parts first is Mean ( variables 3-13), Standard Error(13-23) and Worst(23-32) and each contain 10 parameter (radius, texture,area, perimeter, smoothness,compactness,concavity,concave points,symmetry and fractal dimension of the tumor). When predicting cancer breast tumor types;
+In this tutorial I'm going to predict whether a breast cancer tumor is benign or malignant. Using [Wiscosin breast cancer data set](https://www.kaggle.com/uciml/breast-cancer-wisconsin-data)  available on Kaggle. The 30 predictors are divided into three parts first is Mean ( variables 3-13), Standard Error(13-23) and Worst(23-32) and each contain 10 parameter (radius, texture,area, perimeter, smoothness,compactness,concavity,concave points,symmetry and fractal dimension of the tumor). When predicting cancer breast tumor types there two types of cost;
 
 * The cost of telling someone who has malignant tumor that they have benign these are the false negatives in this case someone might not seek medical help which is can cause death.
-* Telling someone that they have malignant type of tumor but they don't which is usually false positives. In this case you subject someone to un necessary stress
+* Telling someone that they have malignant type of tumor but they don't which is usually false positives. In this case you subject someone to unnecessary stress
 
-So it's highly desirable that our model has good accuracy $latex f_1 score$ and high recall.
+So it's highly desirable that our model has good accuracy $ f_1 score$ and high recall.
 
 ```{r, message=FALSE, warning=FALSE}
 
@@ -52,6 +52,9 @@ library(caret)
 library(e1071)
 library(kableExtra)
 library(ggthemes)
+library(mlr)
+library(glmnet)
+
 cancer <- setDT(read_csv("data.csv"))
 
 cancer[, X33 := NULL]
@@ -73,17 +76,20 @@ The percentage of women with malignant tumor is 37.26%(212 out 569) while the re
 
 
 ```{r, fig.width = 6.5, fig.height = 4.5 }
-cancer%>%group_by(diagnosis) %>% 
-    summarise(freq = n()) %>%
-    mutate(perc = round(100 * freq/sum(freq), 2)) %>%
+
+cancer[, .(freq = .N),
+       by = diagnosis] %>% 
+    .[, perc := round(100 * freq/sum(freq), 2)] %>%
+  
 ggplot(aes(x=diagnosis, y=perc, fill = diagnosis)) + 
-    geom_bar(stat = "identity", width  = 0.5)+theme_hc()+
+    geom_bar(stat = "identity", width  = 0.5)+ theme_hc() +
     geom_text(aes(x=diagnosis, y=perc, label = paste(perc, "%")),
               position =  position_dodge(width = 0.5),
               vjust = 0.05, hjust = 0.5, size = 5)+
     scale_fill_hc(name = "")+
     labs(x = "Cancer Type",
-         y = "Percentage", title = "Percentage of women with benign or malignant breast bancer")+
+         y = "Percentage",
+         title = "Percentage of women with benign or malignant breast bancer")+
     theme(legend.position = "none",
           axis.title = element_text(size =12))
 
@@ -204,6 +210,19 @@ test <- pcadat[-train_sample,]
 # ***Model Fitting***
 
 
+* Some of the importants terms to understand: 
+Accuracy:
+
+$$latexAccuracy  = \frac{True\: positives+ True \; Negatives \;Classes}{N}$$
+
+- Precision: Of  all the patients we predicted that they have cancer malignant how many actually have cancer
+$$latexPrecision  = \frac{True \; Positives}{Predicted \; Positives}$$
+
+- Recall(sensitivity): Of all the patients that have malignant cancer how many did we detect. This is the true positive rate
+$$latexRecall= \frac{True \; Positives}{Actual \; Positives}$$
+- Specifity is the true negative rate. Of all the patient who did not have malignant tumors how many did we detect
+$$latexRecall= \frac{True \; Negatives}{Actual \; Negatives}$$
+
 ***Logistic regression***
 -----
 This is one of generalized linear models which deals with binary data. There is a generalization of this model which is called multinomial regression where you can fit multi class data. The equation for logistic regression model is:
@@ -237,7 +256,7 @@ testx <- data.matrix(test[, -1])
 
 ```
 
-To find the optimal values $latex\lambda$ we use cross validation. We choose $latex\lambda$ which gives the highest cross validation accuracy.
+To find the optimal values $\lambda$ we use cross validation. We choose $\lambda$ which gives the highest cross validation accuracy.
 
 ```{r}
 library(glmnet)
@@ -245,6 +264,9 @@ library(glmnet)
 cv_glm = cv.glmnet(trainx, y, family = "binomial", type.measure = "class")
 
 ```
+
+
+
 
 ```{r}
 
@@ -259,37 +281,35 @@ pred_glm <- predict(glm_fit,newx = testx, s = lamda_min, type = "response")
 
 
 ```{r}
-pred_glm <- ifelse(pred_glm>0.7, 1 , 0)
+pred_glm1 <- ifelse(pred_glm>0.7, 1 , 0)
 ```
 
 
 ```{r}
-table(ytest, pred_glm)  %>% 
+table(ytest, pred_glm1)  %>% 
     kable() 
 ```
 
 
+
 ```{r,}
 library(pROC)
-roc(ytest, as.numeric(pred_glm), print.auc=T, print.auc.y=0.5, levels =0:1 ) 
-
+roc2 <- roc(ytest, pred_glm, print.auc=T ) 
+plot(roc2)
 ```
 
 
 
+```{r}
+train_task <- makeClassifTask(data = train,target = "label", positive = "M")
+logreg_learner <- makeLearner("classif.cvglmnet", predict.type = "prob")
+logreg_m <- train(logreg_learner, train_task)
 
-* Some of the importants terms to understand: 
-Accuracy: fff
+logreg_m_pred <- predict(logreg_m, train_task)
 
-$$latexAccuracy  = \frac{True\: positives+ True \; Negatives \;Classes}{N}$$
+```
 
-- Precision: Of  all the patients we predicted that they have cancer malignant how many actually have cancer
-$$latexPrecision  = \frac{True \; Positives}{Predicted \; Positives}$$
 
-- Recall(sensitivity): Of all the patients that have malignant cancer how many did we detect. This is the true positive rate
-$$latexRecall= \frac{True \; Positives}{Actual \; Positives}$$
-- Specifity is the true negative rate. Of all the patient who did not have malignant tumors how many did we detect
-$$latexRecall= \frac{True \; Negatives}{Actual \; Negatives}$$
 ```{r,}
 table(ytest, pred_glm) %>% 
     confusionMatrix(positive = "1") %>%  
