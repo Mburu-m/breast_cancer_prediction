@@ -52,7 +52,7 @@ library(caret)
 library(e1071)
 library(kableExtra)
 library(ggthemes)
-library(mlr)
+#library(mlr)
 library(glmnet)
 
 cancer <- setDT(read_csv("data.csv"))
@@ -244,13 +244,13 @@ The warning "glm.fit: fitted probabilities numerically 0 or 1 occurred" shows th
 $$J(\theta) = -\frac{1}{m}\sum_{i=0}^{m} y^i log(h_\theta(x^i)) + (1-y^i) log(1 - h_\theta(x^i)) + \frac {\lambda}{2m}\sum_{j=1}^{n} |\theta^i|$$
 ```{r}
 
-trainx <- data.matrix(train[,-1]) 
+trainx <- train[,-1]
 
-y <- factor(train$label, levels = c("B", "M"), labels = 0:1)
-y <- as.numeric(as.character(y))
+y_train <- factor(train$label, levels = c("B", "M"), labels = 0:1)
+#y <- as.numeric(as.character(y))
 
-ytest <- factor(test$label, levels = c("B", "M"), labels = 0:1) %>% as.character() %>% as.numeric()
-ytest <- as.numeric(as.character(ytest))
+y_test <- factor(test$label, levels = c("B", "M"), labels = 0:1) %>% as.character() %>% as.numeric()
+#ytest <- as.numeric(as.character(ytest))
 
 testx <- data.matrix(test[, -1]) 
 
@@ -259,9 +259,27 @@ testx <- data.matrix(test[, -1])
 To find the optimal values $\lambda$ we use cross validation. We choose $\lambda$ which gives the highest cross validation accuracy.
 
 ```{r}
-library(glmnet)
 
-cv_glm = cv.glmnet(trainx, y, family = "binomial", type.measure = "class")
+myControl <- trainControl(
+  method = "cv", 
+  number = 10,
+  metric = "Accuracy",
+  summaryFunction = twoClassSummary,
+  classProbs = TRUE,
+  verboseIter = TRUE
+)
+
+tuneGrid <-  expand.grid(
+    alpha = 0:1,
+    lambda = seq(0.0001, 1, length.out = 20))
+    
+glmnet_model <- train(
+  label ~.,
+  data = train,
+  method = "glmnet",
+  trControl = myControl,
+  tuneGrid = tuneGrid
+)
 
 ```
 
@@ -270,35 +288,35 @@ cv_glm = cv.glmnet(trainx, y, family = "binomial", type.measure = "class")
 
 ```{r}
 
-plot(cv_glm) 
-lamda_min <- cv_glm$lambda.min
+plot(glmnet_model) 
+#lamda_min <- cv_glm$lambda.min
 ```
 
 ```{r}
-glm_fit = glmnet(trainx, y, family = "binomial")
-pred_glm <- predict(glm_fit,newx = testx, s = lamda_min, type = "response")
-```
 
-
-```{r}
-pred_glm1 <- ifelse(pred_glm>0.7, 1 , 0)
+pred_glm <- predict(glmnet_model, test, type = "prob")
 ```
 
 
 ```{r}
-table(ytest, pred_glm1)  %>% 
+library(caTools)
+colAUC(pred_glm , test$label, plotROC = TRUE)
+pred_glm1 <- predict(glmnet_model, test, type = "raw")
+```
+
+
+```{r}
+table(test$label, pred_glm1)  %>% 
     kable() 
 ```
 
 
-
-```{r,}
-library(pROC)
-roc2 <- roc(ytest, pred_glm, print.auc=T ) 
-plot(roc2)
+```{r}
+table(test$label, pred_glm1)  %>% 
+  confusionMatrix(positive = "M") %>%
+  tidy() %>%
+    kable() 
 ```
-
-
 
 ```{r}
 train_task <- makeClassifTask(data = train,target = "label", positive = "M")
