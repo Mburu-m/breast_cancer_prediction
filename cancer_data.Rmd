@@ -3,12 +3,12 @@ title: "Cancer Data"
 author: "Mburu"
 date: "January 26, 2019"
 output:
+  html_notebook: null
+  always_allow_html: yes
   github_document:
     df_print: paged
     toc: yes
     toc_depth: '3'
-  always_allow_html: yes
-  html_notebook: null
   pdf_document:
     toc: yes
   word_document:
