@@ -3,6 +3,31 @@ Cancer Data
 Mburu
 January 26, 2019
 
+  - [***Data Set***](#data-set)
+  - [***Visualization and Feature
+    selection***](#visualization-and-feature-selection)
+      - [***Percentage of women with malignant
+        tumor***](#percentage-of-women-with-malignant-tumor)
+      - [***Boxplots***](#boxplots)
+      - [***Features Scaling***](#features-scaling)
+      - [***Correlation matrix***](#correlation-matrix)
+      - [***Principle Component
+        Analysis***](#principle-component-analysis)
+      - [***Variance Explained***](#variance-explained)
+      - [***Scree plot***](#scree-plot)
+      - [***Cumulative Variance
+        Explained***](#cumulative-variance-explained)
+      - [***Construct new data set***](#construct-new-data-set)
+  - [***Model Fitting***](#model-fitting)
+      - [***Logistic regression***](#logistic-regression)
+      - [***Regularization in logistic
+        regression***](#regularization-in-logistic-regression)
+      - [***SVM***](#svm)
+      - [***Tuning SVM***](#tuning-svm)
+      - [***Xgboost***](#xgboost)
+      - [***Learning Curves***](#learning-curves)
+      - [***Error Analysis***](#error-analysis)
+
 # ***Data Set***
 
 In this tutorial I’m going to predict whether a breast cancer tumor is
@@ -1457,7 +1482,7 @@ ggplot(aes(x=diagnosis, y=perc, fill = diagnosis)) +
           axis.title = element_text(size =12))
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 ## ***Boxplots***
 
@@ -1480,7 +1505,7 @@ ggplot(cancerm, aes(x = diagnosis, y = value))+
     geom_boxplot() + facet_wrap(~variable, scales = "free_y")
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 ## ***Features Scaling***
 
@@ -7082,7 +7107,7 @@ plot(prop_var, xlab = "Principal Component",
      type = "b", xlim = c(0, 30))
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ## ***Cumulative Variance Explained***
 
@@ -7100,7 +7125,7 @@ plot(cum_var, xlab = "Principal Component",
      type = "b", xlim = c(0, 30))
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ## ***Construct new data set***
 
@@ -7215,7 +7240,7 @@ s
 plot(glmnet_model) 
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 ``` r
 #lamda_min <- cv_glm$lambda.min
@@ -7232,7 +7257,7 @@ ggplot(resample_glmnet , aes(x = prob_threshold, y = F1)) +
   geom_point(aes(y = Sensitivity), col = "blue")
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 ``` r
 library(caTools)
@@ -7242,7 +7267,7 @@ pred_glm <- predict(glmnet_model, test, type = "prob")
 colAUC(pred_glm , test$label, plotROC = TRUE)
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
     ##                 M         B
     ## M vs. B 0.9683183 0.9683183
@@ -7257,583 +7282,36 @@ pred_glm1 <- factor(pred_glm1, levels = levels(test$label))
 ```
 
 ``` r
-table(test$label, pred_glm1)  %>% 
-  confusionMatrix(positive = "M") %>%
-  tidy() %>%
-    kable() 
+confusionMatrix(pred_glm1, test$label,positive = "M") 
 ```
 
-<table>
-
-<thead>
-
-<tr>
-
-<th style="text-align:left;">
-
-term
-
-</th>
-
-<th style="text-align:left;">
-
-class
-
-</th>
-
-<th style="text-align:right;">
-
-estimate
-
-</th>
-
-<th style="text-align:right;">
-
-conf.low
-
-</th>
-
-<th style="text-align:right;">
-
-conf.high
-
-</th>
-
-<th style="text-align:right;">
-
-p.value
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<tr>
-
-<td style="text-align:left;">
-
-accuracy
-
-</td>
-
-<td style="text-align:left;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-0.9181287
-
-</td>
-
-<td style="text-align:right;">
-
-0.8664488
-
-</td>
-
-<td style="text-align:right;">
-
-0.9545172
-
-</td>
-
-<td style="text-align:right;">
-
-0
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-kappa
-
-</td>
-
-<td style="text-align:left;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-0.8202703
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-1
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-sensitivity
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.8833333
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-specificity
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9369369
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-pos\_pred\_value
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.8833333
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-neg\_pred\_value
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9369369
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-precision
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.8833333
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-recall
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.8833333
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-f1
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.8833333
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-prevalence
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.3508772
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-detection\_rate
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.3099415
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-detection\_prevalence
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.3508772
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-balanced\_accuracy
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9101351
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-</tbody>
-
-</table>
+    ## Confusion Matrix and Statistics
+    ## 
+    ##           Reference
+    ## Prediction   M   B
+    ##          M  53   7
+    ##          B   7 104
+    ##                                           
+    ##                Accuracy : 0.9181          
+    ##                  95% CI : (0.8664, 0.9545)
+    ##     No Information Rate : 0.6491          
+    ##     P-Value [Acc > NIR] : <2e-16          
+    ##                                           
+    ##                   Kappa : 0.8203          
+    ##                                           
+    ##  Mcnemar's Test P-Value : 1               
+    ##                                           
+    ##             Sensitivity : 0.8833          
+    ##             Specificity : 0.9369          
+    ##          Pos Pred Value : 0.8833          
+    ##          Neg Pred Value : 0.9369          
+    ##              Prevalence : 0.3509          
+    ##          Detection Rate : 0.3099          
+    ##    Detection Prevalence : 0.3509          
+    ##       Balanced Accuracy : 0.9101          
+    ##                                           
+    ##        'Positive' Class : M               
+    ## 
 
 ## ***SVM***
 
@@ -7846,7 +7324,7 @@ separable data. It’s clear that we can separate the two classes using a
 straight line(decision boundary). Which is normally referred to a
 separating hyperplane.
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
 The question is, since there exists many lines that can separate the red
 and the black classes which is the best one. This introduces us to the
@@ -7868,14 +7346,14 @@ maximisation problem \[latexwidth \; of \;the \; margin = M \]
 
 \[latexy_i(\beta_0 + \beta_1X_1 + \beta_2X_2) >= M\]
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
 This is a best case scenario but in most cases the classes are noisy.
 Consider the plot below no matter which line you choose some points are
 bound to be on the wrong side of the desicion boundary. Thus maximal
 margin classification would not work.
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
 SVM then introduces what is called a soft margin. In naive explanation
 you can think of this as a margin that allows some points to be on the
@@ -7890,14 +7368,14 @@ of the margin. In some cases the decision boundary maybe non linear. In
 case your are dealing with logistic regression you will be forced to
 introduce polynomial terms which might result in a very large feature
 space. SVM then introduces what are called kernels
-![](cancer-data_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
 
 ## ***Tuning SVM***
 
 ``` r
 svm_tune <-  expand.grid(
-    C =c(0.01, 0.1, 1 ,5 ,  10, 100),
-    sigma = c(0.01,  0.1, 1 ,5, 10))
+    C =c(1 ,5 ,  10, 100, 150),
+    sigma = seq(0, .01, length.out = 5))
     
 svm_model <- train(
   label ~.,
@@ -7909,8 +7387,6 @@ svm_model <- train(
   verbose = FALSE
 )
 ```
-
-    ## maximum number of iterations reached 0.0008326014 -0.0008249198maximum number of iterations reached 0.0003240032 -0.0003204694maximum number of iterations reached 0.0006115015 -0.0006077667maximum number of iterations reached 0.0009571886 -0.0008931768maximum number of iterations reached -4.119895e-05 4.095143e-05maximum number of iterations reached -9.850422e-05 9.265297e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached 0.001539664 -0.001548681maximum number of iterations reached 0.0003200388 -0.0003171143maximum number of iterations reached -1.421135e-05 1.412591e-05maximum number of iterations reached -1.2445e-05 1.1698e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached 0.001213394 -0.001215482maximum number of iterations reached 5.157717e-05 -5.110536e-05maximum number of iterations reached 0.0004133467 -0.0004108314maximum number of iterations reached 0.0001672114 -0.0001568345maximum number of iterations reached -4.120483e-05 4.095727e-05maximum number of iterations reached -9.849909e-05 9.264814e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached 0.002106763 -0.002094251maximum number of iterations reached 0.0007549634 -0.0007413905maximum number of iterations reached 0.0002285625 -0.0002270637maximum number of iterations reached -0.0002114646 0.0002101258maximum number of iterations reached -0.0002114678 0.000210129maximum number of iterations reached 0.002705284 -0.002674588maximum number of iterations reached 0.0006098589 -0.0006021771maximum number of iterations reached 0.0001283165 -0.0001275448maximum number of iterations reached 0.0002029494 -0.0001905186maximum number of iterations reached -4.120602e-05 4.095845e-05maximum number of iterations reached -9.850287e-05 9.26517e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached 0.001305675 -0.001299326maximum number of iterations reached 0.0002094692 -0.000207507maximum number of iterations reached 8.641514e-05 -8.587412e-05maximum number of iterations reached 0.001158367 -0.001085286maximum number of iterations reached 0.0001185674 -4.405211e-05maximum number of iterations reached 5.152293e-05 -1.179744e-05maximum number of iterations reached 8.892716e-05 -2.029769e-05maximum number of iterations reached 9.509404e-05 -2.17441e-05maximum number of iterations reached 0.0014798 -0.001462057maximum number of iterations reached 0.000845585 -0.0008328339maximum number of iterations reached 0.0001823402 -0.0001812309maximum number of iterations reached 0.0002571072 -0.0002405945maximum number of iterations reached -4.1205e-05 4.095744e-05maximum number of iterations reached -9.847749e-05 9.26278e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached 0.001116763 -0.001106208maximum number of iterations reached -5.955638e-05 5.915879e-05maximum number of iterations reached -0.0001092571 0.0001085318maximum number of iterations reached -1.423881e-05 1.329458e-05maximum number of iterations reached -0.0001092583 0.0001085331maximum number of iterations reached -1.423876e-05 1.329454e-05maximum number of iterations reached 0.002334929 -0.002325351maximum number of iterations reached 0.0004785421 -0.0004712785maximum number of iterations reached -0.0003184519 0.0003164745maximum number of iterations reached 0.00079135 -0.0007413049maximum number of iterations reached -1.350248e-05 5.063432e-06maximum number of iterations reached -1.798432e-05 4.150225e-06maximum number of iterations reached -1.799144e-05 4.151869e-06maximum number of iterations reached -1.798665e-05 4.150763e-06maximum number of iterations reached 0.001583737 -0.001563725maximum number of iterations reached 9.401678e-05 -9.294241e-05maximum number of iterations reached 0.0002961283 -0.0002942753maximum number of iterations reached 0.0003408082 -0.000319314maximum number of iterations reached 1.208911e-05 -2.740462e-06maximum number of iterations reached 3.195985e-05 -7.240552e-06
 
 ``` r
 resample_svm <- thresholder(svm_model, 
@@ -7924,595 +7400,49 @@ ggplot(resample_svm , aes(x = prob_threshold, y = F1, col = "F1")) +
   scale_x_continuous(breaks = seq(0, 1, by = 0.1))
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
 
 ``` r
-pred_svm <-predict(svm_model, newdata = test, type = "prob")
-
 #mean(pred_svm == ytest)
 ```
 
 ``` r
-pred_svm <- ifelse(pred_svm[, "M"] > 0.4, "M", "B")
+pred_svm <-predict(svm_model, newdata = test, type = "prob")
+
+pred_svm <- ifelse(pred_svm[, "M"] > 0.40, "M", "B")
 
 pred_svm <- factor(pred_svm, levels = levels(test$label))
-table(test$label, pred_svm)  %>% 
-  confusionMatrix(positive = "M") %>%
-  tidy()%>%
-  kable()
+
+confusionMatrix(test$label, pred_svm, positive = "M") 
 ```
 
-<table>
-
-<thead>
-
-<tr>
-
-<th style="text-align:left;">
-
-term
-
-</th>
-
-<th style="text-align:left;">
-
-class
-
-</th>
-
-<th style="text-align:right;">
-
-estimate
-
-</th>
-
-<th style="text-align:right;">
-
-conf.low
-
-</th>
-
-<th style="text-align:right;">
-
-conf.high
-
-</th>
-
-<th style="text-align:right;">
-
-p.value
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<tr>
-
-<td style="text-align:left;">
-
-accuracy
-
-</td>
-
-<td style="text-align:left;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-0.9766082
-
-</td>
-
-<td style="text-align:right;">
-
-0.9411932
-
-</td>
-
-<td style="text-align:right;">
-
-0.9935906
-
-</td>
-
-<td style="text-align:right;">
-
-0
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-kappa
-
-</td>
-
-<td style="text-align:left;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-0.9486486
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-1
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-sensitivity
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9666667
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-specificity
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9819820
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-pos\_pred\_value
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9666667
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-neg\_pred\_value
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9819820
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-precision
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9666667
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-recall
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9666667
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-f1
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9666667
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-prevalence
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.3508772
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-detection\_rate
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.3391813
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-detection\_prevalence
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.3508772
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-balanced\_accuracy
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9743243
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-</tbody>
-
-</table>
+    ## Confusion Matrix and Statistics
+    ## 
+    ##           Reference
+    ## Prediction   M   B
+    ##          M  58   2
+    ##          B   2 109
+    ##                                           
+    ##                Accuracy : 0.9766          
+    ##                  95% CI : (0.9412, 0.9936)
+    ##     No Information Rate : 0.6491          
+    ##     P-Value [Acc > NIR] : <2e-16          
+    ##                                           
+    ##                   Kappa : 0.9486          
+    ##                                           
+    ##  Mcnemar's Test P-Value : 1               
+    ##                                           
+    ##             Sensitivity : 0.9667          
+    ##             Specificity : 0.9820          
+    ##          Pos Pred Value : 0.9667          
+    ##          Neg Pred Value : 0.9820          
+    ##              Prevalence : 0.3509          
+    ##          Detection Rate : 0.3392          
+    ##    Detection Prevalence : 0.3509          
+    ##       Balanced Accuracy : 0.9743          
+    ##                                           
+    ##        'Positive' Class : M               
+    ## 
 
 ## ***Xgboost***
 
@@ -8557,6 +7487,7 @@ used for prediction.
 # "subsample" is the fraction of the training samples (randomly selected) that will be used to train each tree.
 # "colsample_by_tree" is the fraction of features (randomly selected) that will be used to train each tree.
 # "colsample_bylevel" is the fraction of features (randomly selected) that will be used in each node to train each tree.
+#eta learning rate
 
 
 
@@ -8571,12 +7502,12 @@ xgb_ctrl <- trainControl(method = "cv",
                         search = "grid")
 
 xgb_grid <- expand.grid(nrounds = c(10, 50, 100),
-                        eta = c(0.01,0.05,0.1),
-                        max_depth = c(10, 50, 80),
-                        gamma = c(0, 1, 5),
-                        colsample_bytree = seq(0.6, .9, length.out = 3),
-                        min_child_weight = c(.8, .90, .95),
-                        subsample =  c(.5, .7, .8)
+                        eta = seq(0.06, .2, length.out = 3),
+                        max_depth = c(50, 80),
+                        gamma = c(0,.01, 0.1),
+                        colsample_bytree = c(0.6, 0.7,0.8),
+                        min_child_weight = 1,
+                        subsample =  .7
                         
     )
 
@@ -8614,596 +7545,43 @@ ggplot(resample_xgb , aes(x = prob_threshold, y = F1, col = "F1")) +
   scale_x_continuous(breaks = seq(0, 1, by =.1))
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
 
 ``` r
 pred_xgb <-predict(xgb_model, newdata = test, type = "prob")
-```
-
-``` r
-pred_xgb <- predict(xgb_model, newdata = test, type = "prob")
-```
-
-``` r
 pred_xgb1 <- ifelse(pred_xgb[, "M"] > 0.4, "M", "B")
 pred_xgb1 <- factor(pred_xgb1, levels = levels(test$label))
-table(test$label, pred_xgb1 ) %>%
-  confusionMatrix(positive = "M") %>%
-  tidy() %>% 
-  kable()
+
+confusionMatrix(pred_xgb1,test$label,  positive = "M") 
 ```
 
-<table>
-
-<thead>
-
-<tr>
-
-<th style="text-align:left;">
-
-term
-
-</th>
-
-<th style="text-align:left;">
-
-class
-
-</th>
-
-<th style="text-align:right;">
-
-estimate
-
-</th>
-
-<th style="text-align:right;">
-
-conf.low
-
-</th>
-
-<th style="text-align:right;">
-
-conf.high
-
-</th>
-
-<th style="text-align:right;">
-
-p.value
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<tr>
-
-<td style="text-align:left;">
-
-accuracy
-
-</td>
-
-<td style="text-align:left;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-0.9590643
-
-</td>
-
-<td style="text-align:right;">
-
-0.9174782
-
-</td>
-
-<td style="text-align:right;">
-
-0.9833858
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-kappa
-
-</td>
-
-<td style="text-align:left;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-0.9111556
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-0.4496918
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-sensitivity
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9206349
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-specificity
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9814815
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-pos\_pred\_value
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9666667
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-neg\_pred\_value
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9549550
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-precision
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9666667
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-recall
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9206349
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-f1
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9430894
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-prevalence
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.3684211
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-detection\_rate
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.3391813
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-detection\_prevalence
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.3508772
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-balanced\_accuracy
-
-</td>
-
-<td style="text-align:left;">
-
-M
-
-</td>
-
-<td style="text-align:right;">
-
-0.9510582
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-<td style="text-align:right;">
-
-NA
-
-</td>
-
-</tr>
-
-</tbody>
-
-</table>
+    ## Confusion Matrix and Statistics
+    ## 
+    ##           Reference
+    ## Prediction   M   B
+    ##          M  59   1
+    ##          B   1 110
+    ##                                           
+    ##                Accuracy : 0.9883          
+    ##                  95% CI : (0.9584, 0.9986)
+    ##     No Information Rate : 0.6491          
+    ##     P-Value [Acc > NIR] : <2e-16          
+    ##                                           
+    ##                   Kappa : 0.9743          
+    ##                                           
+    ##  Mcnemar's Test P-Value : 1               
+    ##                                           
+    ##             Sensitivity : 0.9833          
+    ##             Specificity : 0.9910          
+    ##          Pos Pred Value : 0.9833          
+    ##          Neg Pred Value : 0.9910          
+    ##              Prevalence : 0.3509          
+    ##          Detection Rate : 0.3450          
+    ##    Detection Prevalence : 0.3509          
+    ##       Balanced Accuracy : 0.9872          
+    ##                                           
+    ##        'Positive' Class : M               
+    ## 
 
 ## ***Learning Curves***
 
@@ -9212,15 +7590,27 @@ sets <- seq(from = 50, to = nrow(train), by = 50)
 sets[length(sets)] <-nrow(train) 
 train.err <- c()
 test.err<- c()
+tune_grid <- expand.grid( nrounds = 50, max_depth = 50, eta = 0.06, gamma = 0.01, 
+                         colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
 for (i in 1:length(sets)) {
     
     traini = train[1:sets[i],]
-    fit_svm <- train(label ~., data = traini, metric="Accuracy", method = "svmRadial", 
+    fit_svm <- train(label ~., data = traini, metric="Accuracy", method = "svmRadial",
                  trControl = trainControl(method = "none", summaryFunction = twoClassSummary,
                                           classProbs = TRUE),
-                 tuneGrid = expand_grid(sigma = 0.01, C = 5),
+                 tuneGrid = expand_grid( sigma = 0.0075, C = 5),
                  )
     
+    # fit_svm <-train(label~.,
+    #              data=traini,
+    #              method="xgbTree",
+    #              trControl= xgb_ctrl,
+    #              tuneGrid= tune_grid ,
+    #              verbose=T,
+    #              metric="ROC",
+    #              nthread =3
+    #                  
+    # )
     pred_train = predict(fit_svm, newdata = traini, type = "prob")
     pred_train = ifelse(pred_train[["M"]] > 0.4, "M", "B")
     train.err[i] =1 -  mean(pred_train == traini$label)
@@ -9239,8 +7629,8 @@ for (i in 1:length(sets)) {
 train.err
 ```
 
-    ## [1] 0.00000000 0.03000000 0.02666667 0.00500000 0.02000000 0.01333333
-    ## [7] 0.02763819
+    ## [1] 0.00000000 0.03000000 0.03333333 0.00500000 0.02000000 0.01333333
+    ## [7] 0.02261307
 
 ``` r
 matplot(sets, cbind(test.err, train.err), pch = 19, col = c("red", "blue"),
@@ -9248,7 +7638,7 @@ matplot(sets, cbind(test.err, train.err), pch = 19, col = c("red", "blue"),
 legend("topright", legend = c("Test", "Train"), pch = 19, col = c("red", "blue"))
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-31-1.png)<!-- -->
+![](cancer_data_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
 
 ## ***Error Analysis***
 
@@ -9268,11 +7658,9 @@ test_mis_svm <- df[(diagnosis == "M" & pred_svm == 0) |( diagnosis == "B" & pred
 ```
 
 ``` r
-test_mis_svm_m <- melt(test_mis_svm, 
-                id.vars = c("diagnosis", "pred_svm"))
-
-ggplot(test_mis_svm_m , aes(x = pred_svm, y = value))+
-    geom_boxplot() + facet_wrap(~variable, scales = "free_y")
+# test_mis_svm_m <- melt(test_mis_svm, 
+#                 id.vars = c("diagnosis", "pred_svm"))
+# 
+# ggplot(test_mis_svm_m , aes(x = pred_svm, y = value))+
+#     geom_boxplot() + facet_wrap(~variable, scales = "free_y")
 ```
-
-![](cancer-data_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
