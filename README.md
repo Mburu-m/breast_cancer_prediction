@@ -12,17 +12,18 @@ available on Kaggle. The 30 predictors are divided into three parts
 first is Mean ( variables 3-13), Standard Error(13-23) and Worst(23-32)
 and each contain 10 parameter (radius, texture,area, perimeter,
 smoothness,compactness,concavity,concave points,symmetry and fractal
-dimension of the tumor). When predicting cancer breast tumor types;
+dimension of the tumor). When predicting cancer breast tumor types there
+two types of cost;
 
   - The cost of telling someone who has malignant tumor that they have
     benign these are the false negatives in this case someone might not
     seek medical help which is can cause death.
   - Telling someone that they have malignant type of tumor but they
     don’t which is usually false positives. In this case you subject
-    someone to un necessary stress
+    someone to unnecessary stress
 
-So it’s highly desirable that our model has good accuracy
-\(latex f_1 score\) and high recall.
+So it’s highly desirable that our model has good accuracy $ f\_1 score$
+and high recall.
 
 ``` r
 library(tidyverse)
@@ -34,6 +35,9 @@ library(caret)
 library(e1071)
 library(kableExtra)
 library(ggthemes)
+
+library(glmnet)
+
 cancer <- setDT(read_csv("data.csv"))
 
 cancer[, X33 := NULL]
@@ -1436,22 +1440,24 @@ The percentage of women with malignant tumor is 37.26%(212 out 569)
 while the rest 62.74%(357) had benign tumors.
 
 ``` r
-cancer%>%group_by(diagnosis) %>% 
-    summarise(freq = n()) %>%
-    mutate(perc = round(100 * freq/sum(freq), 2)) %>%
+cancer[, .(freq = .N),
+       by = diagnosis] %>% 
+    .[, perc := round(100 * freq/sum(freq), 2)] %>%
+  
 ggplot(aes(x=diagnosis, y=perc, fill = diagnosis)) + 
-    geom_bar(stat = "identity", width  = 0.5)+theme_hc()+
+    geom_bar(stat = "identity", width  = 0.5)+ theme_hc() +
     geom_text(aes(x=diagnosis, y=perc, label = paste(perc, "%")),
               position =  position_dodge(width = 0.5),
               vjust = 0.05, hjust = 0.5, size = 5)+
     scale_fill_hc(name = "")+
     labs(x = "Cancer Type",
-         y = "Percentage", title = "Percentage of women with benign or malignant breast bancer")+
+         y = "Percentage",
+         title = "Percentage of women with benign or malignant breast bancer")+
     theme(legend.position = "none",
           axis.title = element_text(size =12))
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](cancer-data_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 ## ***Boxplots***
 
@@ -1474,7 +1480,7 @@ ggplot(cancerm, aes(x = diagnosis, y = value))+
     geom_boxplot() + facet_wrap(~variable, scales = "free_y")
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](cancer-data_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 ## ***Features Scaling***
 
@@ -7076,7 +7082,7 @@ plot(prop_var, xlab = "Principal Component",
      type = "b", xlim = c(0, 30))
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](cancer-data_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ## ***Cumulative Variance Explained***
 
@@ -7094,7 +7100,7 @@ plot(cum_var, xlab = "Principal Component",
      type = "b", xlim = c(0, 30))
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](cancer-data_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ## ***Construct new data set***
 
@@ -7105,13 +7111,29 @@ randomly split data into training and test set in 7:3 ratio.
 set.seed(100)
 train_sample <- sample(1:nrow(cancer), round(0.7*nrow(cancer)))
 
-pcadat <- data.frame( label = cancer$diagnosis, pca$x[,1:15]) 
-
+pcadat <- data.table( label = cancer$diagnosis, pca$x[,1:15]) 
+pcadat[, label := factor(label, levels = c("M", "B"))]
 train <- pcadat[train_sample,]
 test <- pcadat[-train_sample,]
 ```
 
 # ***Model Fitting***
+
+  - Some of the importants terms to understand: Accuracy:
+
+\[Accuracy  = \frac{True\: positives+ True \; Negatives \;Classes}{N}\]
+
+  - Precision: Of all the patients we predicted that they have cancer
+    malignant how many actually have cancer
+    \[Precision  = \frac{True \; Positives}{Predicted \; Positives}\]
+
+  - Recall(sensitivity): Of all the patients that have malignant cancer
+    how many did we detect. This is the true positive rate
+    \[Recall= \frac{True \; Positives}{Actual \; Positives}\]
+
+  - Specifity is the true negative rate. Of all the patient who did not
+    have malignant tumors how many did we detect
+    \[Recall= \frac{True \; Negatives}{Actual \; Negatives}\]
 
 ## ***Logistic regression***
 
@@ -7120,11 +7142,11 @@ There is a generalization of this model which is called multinomial
 regression where you can fit multi class data. The equation for logistic
 regression model is:
 
-\[latexlog(\frac{p}{1-p}) = \beta_0 + \beta_1*X_1 + ... \beta_n * X_n\]
-and using mle the cost function can be derived as:
-\[latexJ(\theta) = -\frac{1}{m}\sum_{i=1}^{m} y^i log(h_\theta(x^i)) + (1-y^i) log(1 - h_\theta(x^i))\]
-Given that \(latexy = 0\) \(latexy = 1\) . Finding \(latex\beta\) s we
-minimizing the cost function.
+\[log(\frac{p}{1-p}) = \beta_0 + \beta_1*X_1 + ... \beta_n * X_n\] and
+using mle the cost function can be derived as:
+\[J(\theta) = -\frac{1}{m}\sum_{i=1}^{m} y^i log(h_\theta(x^i)) + (1-y^i) log(1 - h_\theta(x^i))\]
+Given that \[y = 0\] \[y = 1\] . Finding \[\beta\] s we minimizing the
+cost function.
 
 ``` r
 fit_glm <- glm(label ~., data = train, family = binomial)
@@ -7144,161 +7166,100 @@ values of the coefficients.
 \[J(\theta) = -\frac{1}{m}\sum_{i=0}^{m} y^i log(h_\theta(x^i)) + (1-y^i) log(1 - h_\theta(x^i)) + \frac {\lambda}{2m}\sum_{j=1}^{n} |\theta^i|\]
 
 ``` r
-trainx <- data.matrix(train[,-1]) 
+trainx <- train[,-1]
 
-y <- factor(train$label, levels = c("B", "M"), labels = 0:1)
-y <- as.numeric(as.character(y))
+y_train <- factor(train$label, levels = c("B", "M"), labels = 0:1)
+#y <- as.numeric(as.character(y))
 
-ytest <- factor(test$label, levels = c("B", "M"), labels = 0:1) %>% as.character() %>% as.numeric()
-ytest <- as.numeric(as.character(ytest))
+y_test <- factor(test$label, levels = c("B", "M"), labels = 0:1) %>% as.character() %>% as.numeric()
+#ytest <- as.numeric(as.character(ytest))
 
 testx <- data.matrix(test[, -1]) 
 ```
 
-To find the optimal values \(latex\lambda\) we use cross validation. We
-choose \(latex\lambda\) which gives the highest cross validation
-accuracy.
+To find the optimal values \(\lambda\) we use cross validation. We
+choose \(\lambda\) which gives the highest cross validation accuracy.
 
 ``` r
-library(glmnet)
+cv_fold <- createFolds(train$label, k = 10)
 
-cv_glm = cv.glmnet(trainx, y, family = "binomial", type.measure = "class")
+myControl <- trainControl(
+  method = "cv", 
+  number = 10,
+  summaryFunction = twoClassSummary,
+  savePredictions = "all",
+  classProbs = TRUE,
+  verboseIter = FALSE,
+  index = cv_fold,
+  allowParallel = TRUE
+  
+)
+
+tuneGrid <-  expand.grid(
+    alpha = 0:1,
+    lambda = seq(0.001, 1, length.out = 10))
+    
+glmnet_model <- train(
+  label ~.,
+  data = train,
+  method = "glmnet",
+  metric = "ROC",
+  trControl = myControl,
+  tuneGrid = tuneGrid
+)
+```
+
+s
+
+``` r
+plot(glmnet_model) 
+```
+
+![](cancer-data_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+
+``` r
+#lamda_min <- cv_glm$lambda.min
 ```
 
 ``` r
-plot(cv_glm) 
+resample_glmnet <- thresholder(glmnet_model, 
+                              threshold = seq(.2, 1, by = 0.05), 
+                              final = TRUE, 
+                              statistics = "all")
+
+ggplot(resample_glmnet , aes(x = prob_threshold, y = F1)) + 
+  geom_point() + 
+  geom_point(aes(y = Sensitivity), col = "blue")
 ```
 
 ![](cancer-data_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 ``` r
-lamda_min <- cv_glm$lambda.min
+library(caTools)
+
+pred_glm <- predict(glmnet_model, test, type = "prob")
+
+colAUC(pred_glm , test$label, plotROC = TRUE)
+```
+
+![](cancer-data_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+
+    ##                 M         B
+    ## M vs. B 0.9683183 0.9683183
+
+``` r
+pred_glm1 <- ifelse(pred_glm[, "M"] > 0.4, "M", "B")
+#pred_glm1 <- predict(glmnet_model, test, type = "raw")
 ```
 
 ``` r
-glm_fit = glmnet(trainx, y, family = "binomial")
-pred_glm <- predict(glm_fit,newx = testx, s = lamda_min, type = "response")
+pred_glm1 <- factor(pred_glm1, levels = levels(test$label))
 ```
 
 ``` r
-pred_glm <- ifelse(pred_glm>0.7, 1 , 0)
-```
-
-``` r
-table(ytest, pred_glm)  %>% 
-    kable() 
-```
-
-<table>
-
-<thead>
-
-<tr>
-
-<th style="text-align:left;">
-
-</th>
-
-<th style="text-align:right;">
-
-0
-
-</th>
-
-<th style="text-align:right;">
-
-1
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<tr>
-
-<td style="text-align:left;">
-
-0
-
-</td>
-
-<td style="text-align:right;">
-
-111
-
-</td>
-
-<td style="text-align:right;">
-
-0
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-1
-
-</td>
-
-<td style="text-align:right;">
-
-6
-
-</td>
-
-<td style="text-align:right;">
-
-54
-
-</td>
-
-</tr>
-
-</tbody>
-
-</table>
-
-``` r
-library(pROC)
-roc(ytest, as.numeric(pred_glm), print.auc=T, print.auc.y=0.5, levels =0:1 ) 
-```
-
-    ## 
-    ## Call:
-    ## roc.default(response = ytest, predictor = as.numeric(pred_glm),     levels = 0:1, print.auc = T, print.auc.y = 0.5)
-    ## 
-    ## Data: as.numeric(pred_glm) in 111 controls (ytest 0) < 60 cases (ytest 1).
-    ## Area under the curve: 0.95
-
-  - Some of the importants terms to understand: Accuracy: fff
-
-\[latexAccuracy  = \frac{True\: positives+ True \; Negatives \;Classes}{N}\]
-
-  - Precision: Of all the patients we predicted that they have cancer
-    malignant how many actually have cancer
-    \[latexPrecision  = \frac{True \; Positives}{Predicted \; Positives}\]
-
-  - Recall(sensitivity): Of all the patients that have malignant cancer
-    how many did we detect. This is the true positive rate
-    \[latexRecall= \frac{True \; Positives}{Actual \; Positives}\]
-
-  - Specifity is the true negative rate. Of all the patient who did not
-    have malignant tumors how many did we detect
-    \[latexRecall= \frac{True \; Negatives}{Actual \; Negatives}\]
-
-<!-- end list -->
-
-``` r
-table(ytest, pred_glm) %>% 
-    confusionMatrix(positive = "1") %>%  
-    tidy() %>% 
+table(test$label, pred_glm1)  %>% 
+  confusionMatrix(positive = "M") %>%
+  tidy() %>%
     kable() 
 ```
 
@@ -7366,25 +7327,25 @@ NA
 
 <td style="text-align:right;">
 
-0.9649123
+0.9181287
 
 </td>
 
 <td style="text-align:right;">
 
-0.9251962
+0.8664488
 
 </td>
 
 <td style="text-align:right;">
 
-0.9870165
+0.9545172
 
 </td>
 
 <td style="text-align:right;">
 
-0.0000000
+0
 
 </td>
 
@@ -7406,7 +7367,7 @@ NA
 
 <td style="text-align:right;">
 
-0.9211618
+0.8202703
 
 </td>
 
@@ -7424,7 +7385,7 @@ NA
 
 <td style="text-align:right;">
 
-0.0412268
+1
 
 </td>
 
@@ -7440,13 +7401,13 @@ sensitivity
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-1.0000000
+0.8833333
 
 </td>
 
@@ -7480,13 +7441,13 @@ specificity
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.9487179
+0.9369369
 
 </td>
 
@@ -7520,13 +7481,13 @@ pos\_pred\_value
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.9000000
+0.8833333
 
 </td>
 
@@ -7560,13 +7521,13 @@ neg\_pred\_value
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-1.0000000
+0.9369369
 
 </td>
 
@@ -7600,13 +7561,13 @@ precision
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.9000000
+0.8833333
 
 </td>
 
@@ -7640,13 +7601,13 @@ recall
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-1.0000000
+0.8833333
 
 </td>
 
@@ -7680,13 +7641,13 @@ f1
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.9473684
+0.8833333
 
 </td>
 
@@ -7720,13 +7681,13 @@ prevalence
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.3157895
+0.3508772
 
 </td>
 
@@ -7760,13 +7721,13 @@ detection\_rate
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.3157895
+0.3099415
 
 </td>
 
@@ -7800,7 +7761,7 @@ detection\_prevalence
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
@@ -7840,13 +7801,13 @@ balanced\_accuracy
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.9743590
+0.9101351
 
 </td>
 
@@ -7885,7 +7846,7 @@ separable data. It’s clear that we can separate the two classes using a
 straight line(decision boundary). Which is normally referred to a
 separating hyperplane.
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+![](cancer-data_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
 The question is, since there exists many lines that can separate the red
 and the black classes which is the best one. This introduces us to the
@@ -7907,2090 +7868,78 @@ maximisation problem \[latexwidth \; of \;the \; margin = M \]
 
 \[latexy_i(\beta_0 + \beta_1X_1 + \beta_2X_2) >= M\]
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+![](cancer-data_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
 This is a best case scenario but in most cases the classes are noisy.
 Consider the plot below no matter which line you choose some points are
 bound to be on the wrong side of the desicion boundary. Thus maximal
 margin classification would not work.
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
+![](cancer-data_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
 SVM then introduces what is called a soft margin. In naive explanation
 you can think of this as a margin that allows some points to be on the
 wrong side. By introducing an error term we allow for some slack. Thus
 in a two case the maximisation becomes
-\[latex y_i(\beta_0 + \beta_1X_1 + \beta_2X_2) >= M(1- \epsilon)\]
+\[y_i(\beta_0 + \beta_1X_1 + \beta_2X_2) >= M(1- \epsilon)\]
 
-\[latex \sum_{i=0}^{n} \epsilon_i <= C\] C is a tuning parameter which
-determines the width of the margin while \[latex \epsilon_i  \;'s\] are
-slack variables. that allow individual observations to fall on the wrong
-side of the margin. In some cases the decision boundary maybe non
-linear. In case your are dealing with logistic regression you will be
-forced to introduce polynomial terms which might result in a very large
-feature space. SVM then introduces what are called kernels
-![](cancer-data_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+\[\sum_{i=0}^{n} \epsilon_i <= C\] C is a tuning parameter which
+determines the width of the margin while \[\epsilon_i  \;'s\] are slack
+variables. that allow individual observations to fall on the wrong side
+of the margin. In some cases the decision boundary maybe non linear. In
+case your are dealing with logistic regression you will be forced to
+introduce polynomial terms which might result in a very large feature
+space. SVM then introduces what are called kernels
+![](cancer-data_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
 
 ## ***Tuning SVM***
 
 ``` r
-tune.out = tune(svm, train.x = trainx,  train.y = as.factor(y),  kernel ="radial", 
-                type ="C-classification",
-                ranges =list (cost=c(0.01, 0.1, 1 ,5 ,  10),
-                              gamma = c(0.01,  0.1, 1 ,5 )))
-
-summary(tune.out)
+svm_tune <-  expand.grid(
+    C =c(0.01, 0.1, 1 ,5 ,  10, 100),
+    sigma = c(0.01,  0.1, 1 ,5, 10))
+    
+svm_model <- train(
+  label ~.,
+  data = train,
+   metric="ROC",
+  method = "svmRadial",
+  trControl = myControl,
+  tuneGrid = svm_tune,
+  verbose = FALSE
+)
 ```
 
-    ## 
-    ## Parameter tuning of 'svm':
-    ## 
-    ## - sampling method: 10-fold cross validation 
-    ## 
-    ## - best parameters:
-    ##  cost gamma
-    ##    10  0.01
-    ## 
-    ## - best performance: 0.03512821 
-    ## 
-    ## - Detailed performance results:
-    ##     cost gamma      error dispersion
-    ## 1   0.01  0.01 0.38141026 0.08952201
-    ## 2   0.10  0.01 0.36641026 0.08615283
-    ## 3   1.00  0.01 0.05762821 0.04415220
-    ## 4   5.00  0.01 0.04012821 0.02693020
-    ## 5  10.00  0.01 0.03512821 0.02424399
-    ## 6   0.01  0.10 0.38141026 0.08952201
-    ## 7   0.10  0.10 0.19551282 0.07730614
-    ## 8   1.00  0.10 0.06519231 0.04748308
-    ## 9   5.00  0.10 0.06775641 0.04439104
-    ## 10 10.00  0.10 0.07288462 0.04850197
-    ## 11  0.01  1.00 0.38141026 0.08952201
-    ## 12  0.10  1.00 0.38141026 0.08952201
-    ## 13  1.00  1.00 0.37141026 0.09123216
-    ## 14  5.00  1.00 0.36641026 0.08615283
-    ## 15 10.00  1.00 0.36641026 0.08615283
-    ## 16  0.01  5.00 0.38141026 0.08952201
-    ## 17  0.10  5.00 0.38141026 0.08952201
-    ## 18  1.00  5.00 0.38141026 0.08952201
-    ## 19  5.00  5.00 0.38141026 0.08952201
-    ## 20 10.00  5.00 0.38141026 0.08952201
+    ## maximum number of iterations reached 0.0008326014 -0.0008249198maximum number of iterations reached 0.0003240032 -0.0003204694maximum number of iterations reached 0.0006115015 -0.0006077667maximum number of iterations reached 0.0009571886 -0.0008931768maximum number of iterations reached -4.119895e-05 4.095143e-05maximum number of iterations reached -9.850422e-05 9.265297e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached 0.001539664 -0.001548681maximum number of iterations reached 0.0003200388 -0.0003171143maximum number of iterations reached -1.421135e-05 1.412591e-05maximum number of iterations reached -1.2445e-05 1.1698e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached 0.001213394 -0.001215482maximum number of iterations reached 5.157717e-05 -5.110536e-05maximum number of iterations reached 0.0004133467 -0.0004108314maximum number of iterations reached 0.0001672114 -0.0001568345maximum number of iterations reached -4.120483e-05 4.095727e-05maximum number of iterations reached -9.849909e-05 9.264814e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached 0.002106763 -0.002094251maximum number of iterations reached 0.0007549634 -0.0007413905maximum number of iterations reached 0.0002285625 -0.0002270637maximum number of iterations reached -0.0002114646 0.0002101258maximum number of iterations reached -0.0002114678 0.000210129maximum number of iterations reached 0.002705284 -0.002674588maximum number of iterations reached 0.0006098589 -0.0006021771maximum number of iterations reached 0.0001283165 -0.0001275448maximum number of iterations reached 0.0002029494 -0.0001905186maximum number of iterations reached -4.120602e-05 4.095845e-05maximum number of iterations reached -9.850287e-05 9.26517e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached 0.001305675 -0.001299326maximum number of iterations reached 0.0002094692 -0.000207507maximum number of iterations reached 8.641514e-05 -8.587412e-05maximum number of iterations reached 0.001158367 -0.001085286maximum number of iterations reached 0.0001185674 -4.405211e-05maximum number of iterations reached 5.152293e-05 -1.179744e-05maximum number of iterations reached 8.892716e-05 -2.029769e-05maximum number of iterations reached 9.509404e-05 -2.17441e-05maximum number of iterations reached 0.0014798 -0.001462057maximum number of iterations reached 0.000845585 -0.0008328339maximum number of iterations reached 0.0001823402 -0.0001812309maximum number of iterations reached 0.0002571072 -0.0002405945maximum number of iterations reached -4.1205e-05 4.095744e-05maximum number of iterations reached -9.847749e-05 9.26278e-05maximum number of iterations reached -4.120604e-05 4.095847e-05maximum number of iterations reached -9.850309e-05 9.265191e-05maximum number of iterations reached 0.001116763 -0.001106208maximum number of iterations reached -5.955638e-05 5.915879e-05maximum number of iterations reached -0.0001092571 0.0001085318maximum number of iterations reached -1.423881e-05 1.329458e-05maximum number of iterations reached -0.0001092583 0.0001085331maximum number of iterations reached -1.423876e-05 1.329454e-05maximum number of iterations reached 0.002334929 -0.002325351maximum number of iterations reached 0.0004785421 -0.0004712785maximum number of iterations reached -0.0003184519 0.0003164745maximum number of iterations reached 0.00079135 -0.0007413049maximum number of iterations reached -1.350248e-05 5.063432e-06maximum number of iterations reached -1.798432e-05 4.150225e-06maximum number of iterations reached -1.799144e-05 4.151869e-06maximum number of iterations reached -1.798665e-05 4.150763e-06maximum number of iterations reached 0.001583737 -0.001563725maximum number of iterations reached 9.401678e-05 -9.294241e-05maximum number of iterations reached 0.0002961283 -0.0002942753maximum number of iterations reached 0.0003408082 -0.000319314maximum number of iterations reached 1.208911e-05 -2.740462e-06maximum number of iterations reached 3.195985e-05 -7.240552e-06
 
 ``` r
-fit_svm <- svm(x = trainx, y = y, cost =  10, gamma = .01, 
-               kernel = "radial", type ="C-classification")
+resample_svm <- thresholder(svm_model, 
+                              threshold = seq(.0, 1, by = 0.05), 
+                              final = TRUE, 
+                              statistics = "all")
 
-pred_svm <-predict(fit_svm, newdata = testx)
-
-mean(pred_svm == ytest)
+ggplot(resample_svm , aes(x = prob_threshold, y = F1, col = "F1")) + 
+  geom_point() + 
+  geom_point(aes(y = Sensitivity,  col = "Sensitivity"))+
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1))
 ```
 
-    ## [1] 0.9649123
+![](cancer-data_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
 
 ``` r
-roc(ytest, as.numeric(pred_svm), print.auc=T, print.auc.y=0.5, levels =0:1 ) 
-```
+pred_svm <-predict(svm_model, newdata = test, type = "prob")
 
-    ## 
-    ## Call:
-    ## roc.default(response = ytest, predictor = as.numeric(pred_svm),     levels = 0:1, print.auc = T, print.auc.y = 0.5)
-    ## 
-    ## Data: as.numeric(pred_svm) in 111 controls (ytest 0) < 60 cases (ytest 1).
-    ## Area under the curve: 0.9538
-
-``` r
-table(ytest, pred_svm) %>% 
-   kable() 
-```
-
-<table>
-
-<thead>
-
-<tr>
-
-<th style="text-align:left;">
-
-</th>
-
-<th style="text-align:right;">
-
-0
-
-</th>
-
-<th style="text-align:right;">
-
-1
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<tr>
-
-<td style="text-align:left;">
-
-0
-
-</td>
-
-<td style="text-align:right;">
-
-110
-
-</td>
-
-<td style="text-align:right;">
-
-1
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-1
-
-</td>
-
-<td style="text-align:right;">
-
-5
-
-</td>
-
-<td style="text-align:right;">
-
-55
-
-</td>
-
-</tr>
-
-</tbody>
-
-</table>
-
-``` r
-table(ytest, pred_svm)  %>% 
-    kable()
-```
-
-<table>
-
-<thead>
-
-<tr>
-
-<th style="text-align:left;">
-
-</th>
-
-<th style="text-align:right;">
-
-0
-
-</th>
-
-<th style="text-align:right;">
-
-1
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<tr>
-
-<td style="text-align:left;">
-
-0
-
-</td>
-
-<td style="text-align:right;">
-
-110
-
-</td>
-
-<td style="text-align:right;">
-
-1
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-1
-
-</td>
-
-<td style="text-align:right;">
-
-5
-
-</td>
-
-<td style="text-align:right;">
-
-55
-
-</td>
-
-</tr>
-
-</tbody>
-
-</table>
-
-## ***Xgboost***
-
-XGBoost is a type of an ensemble learner. Ensemble learning is where
-multiple machine learning algorithms are used at the same time for
-prediction. A good example will be Random Forests. In random Forest
-multiple decision trees are used together for prediction. There are two
-main types of ensemble learners, bagging and boosting. Random forest use
-the bagging approach. Trees are built from random subsets(rows and
-columns) of training set and then the final prediction is the weighted
-sum of all decision trees functions. Boosting methods are similar but in
-boosting samples are selected sequentially. For instance the first
-sample is selected and a decision tree is fitted, The model then picks
-the examples that were hard to learn and using this examples and a few
-others selected randomly from the training set the second model is
-fitted, Using the first model and the second model prediction is made,
-the model is evaluated and hard examples are picked and together with
-another randomly selected new examples from training set another model
-is trained. This is the process for boosting algorithms which continues
-for a specified number of n.
-
-In gradient boosting the first model is fitted to the original training
-set. Let say your fitting a simple regression model for ease of
-explanation. Then your first model will be
-\(latex y = f(x) + \epsilon\). When you find that the error is too large
-one of the things you might try to do is add more features, use another
-algorithm, tune your algorithm, look for more training data etc. But
-what if the error is not white noise and it has some relationship with
-output \(y\) . Then we can fit a second model.
-\(latex \epsilon = f_1(x) + \epsilon_1\). then this process can continue
-lets say until n times. Then the final model will be
-
-\(latex \epsilon_n = f_{n}(x) + \epsilon_{n-1}\).
-
-Then the final step is to add this models together with some weighting
-criteria \(latex weights = \alpha 's\) which gives us the final function
-used for prediction.
-
-\(y =latex \alpha * f(x) + \alpha_1 * f_1(x) + \alpha_2 * f_2(x)...+ \alpha_n * f_n + \epsilon\)
-
-``` r
-xgtrain <- xgb.DMatrix(trainx, label = y)
-
-cv <- xgb.cv(data = xgtrain, nrounds = 50, nthread = 4, nfold = 3, metrics = "error",
-              max_depth = 2, eta = .4, objective = "binary:logistic", verbose = F)
-
-cv$evaluation_log %>% kable() 
-```
-
-<table>
-
-<thead>
-
-<tr>
-
-<th style="text-align:right;">
-
-iter
-
-</th>
-
-<th style="text-align:right;">
-
-train\_error\_mean
-
-</th>
-
-<th style="text-align:right;">
-
-train\_error\_std
-
-</th>
-
-<th style="text-align:right;">
-
-test\_error\_mean
-
-</th>
-
-<th style="text-align:right;">
-
-test\_error\_std
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<tr>
-
-<td style="text-align:right;">
-
-1
-
-</td>
-
-<td style="text-align:right;">
-
-0.0728240
-
-</td>
-
-<td style="text-align:right;">
-
-0.0156051
-
-</td>
-
-<td style="text-align:right;">
-
-0.0928690
-
-</td>
-
-<td style="text-align:right;">
-
-0.0148361
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-2
-
-</td>
-
-<td style="text-align:right;">
-
-0.0702987
-
-</td>
-
-<td style="text-align:right;">
-
-0.0183607
-
-</td>
-
-<td style="text-align:right;">
-
-0.0903817
-
-</td>
-
-<td style="text-align:right;">
-
-0.0117308
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-3
-
-</td>
-
-<td style="text-align:right;">
-
-0.0527550
-
-</td>
-
-<td style="text-align:right;">
-
-0.0029199
-
-</td>
-
-<td style="text-align:right;">
-
-0.0954320
-
-</td>
-
-<td style="text-align:right;">
-
-0.0088983
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-4
-
-</td>
-
-<td style="text-align:right;">
-
-0.0502487
-
-</td>
-
-<td style="text-align:right;">
-
-0.0046589
-
-</td>
-
-<td style="text-align:right;">
-
-0.0903060
-
-</td>
-
-<td style="text-align:right;">
-
-0.0240076
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-5
-
-</td>
-
-<td style="text-align:right;">
-
-0.0452077
-
-</td>
-
-<td style="text-align:right;">
-
-0.0051821
-
-</td>
-
-<td style="text-align:right;">
-
-0.0827680
-
-</td>
-
-<td style="text-align:right;">
-
-0.0322131
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-6
-
-</td>
-
-<td style="text-align:right;">
-
-0.0389230
-
-</td>
-
-<td style="text-align:right;">
-
-0.0062856
-
-</td>
-
-<td style="text-align:right;">
-
-0.0752300
-
-</td>
-
-<td style="text-align:right;">
-
-0.0322475
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-7
-
-</td>
-
-<td style="text-align:right;">
-
-0.0351637
-
-</td>
-
-<td style="text-align:right;">
-
-0.0034370
-
-</td>
-
-<td style="text-align:right;">
-
-0.0676163
-
-</td>
-
-<td style="text-align:right;">
-
-0.0364233
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-8
-
-</td>
-
-<td style="text-align:right;">
-
-0.0288980
-
-</td>
-
-<td style="text-align:right;">
-
-0.0018281
-
-</td>
-
-<td style="text-align:right;">
-
-0.0650910
-
-</td>
-
-<td style="text-align:right;">
-
-0.0365589
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-9
-
-</td>
-
-<td style="text-align:right;">
-
-0.0188443
-
-</td>
-
-<td style="text-align:right;">
-
-0.0030699
-
-</td>
-
-<td style="text-align:right;">
-
-0.0651290
-
-</td>
-
-<td style="text-align:right;">
-
-0.0334445
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-10
-
-</td>
-
-<td style="text-align:right;">
-
-0.0163287
-
-</td>
-
-<td style="text-align:right;">
-
-0.0046788
-
-</td>
-
-<td style="text-align:right;">
-
-0.0626413
-
-</td>
-
-<td style="text-align:right;">
-
-0.0272731
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-11
-
-</td>
-
-<td style="text-align:right;">
-
-0.0138037
-
-</td>
-
-<td style="text-align:right;">
-
-0.0046634
-
-</td>
-
-<td style="text-align:right;">
-
-0.0600787
-
-</td>
-
-<td style="text-align:right;">
-
-0.0364691
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-12
-
-</td>
-
-<td style="text-align:right;">
-
-0.0112973
-
-</td>
-
-<td style="text-align:right;">
-
-0.0030464
-
-</td>
-
-<td style="text-align:right;">
-
-0.0626037
-
-</td>
-
-<td style="text-align:right;">
-
-0.0334046
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-13
-
-</td>
-
-<td style="text-align:right;">
-
-0.0112973
-
-</td>
-
-<td style="text-align:right;">
-
-0.0030464
-
-</td>
-
-<td style="text-align:right;">
-
-0.0601160
-
-</td>
-
-<td style="text-align:right;">
-
-0.0303299
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-14
-
-</td>
-
-<td style="text-align:right;">
-
-0.0075190
-
-</td>
-
-<td style="text-align:right;">
-
-0.0061392
-
-</td>
-
-<td style="text-align:right;">
-
-0.0601537
-
-</td>
-
-<td style="text-align:right;">
-
-0.0241904
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-15
-
-</td>
-
-<td style="text-align:right;">
-
-0.0087720
-
-</td>
-
-<td style="text-align:right;">
-
-0.0063899
-
-</td>
-
-<td style="text-align:right;">
-
-0.0601537
-
-</td>
-
-<td style="text-align:right;">
-
-0.0241904
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-16
-
-</td>
-
-<td style="text-align:right;">
-
-0.0075190
-
-</td>
-
-<td style="text-align:right;">
-
-0.0061392
-
-</td>
-
-<td style="text-align:right;">
-
-0.0551030
-
-</td>
-
-<td style="text-align:right;">
-
-0.0273205
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-17
-
-</td>
-
-<td style="text-align:right;">
-
-0.0062657
-
-</td>
-
-<td style="text-align:right;">
-
-0.0046887
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526160
-
-</td>
-
-<td style="text-align:right;">
-
-0.0217399
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-18
-
-</td>
-
-<td style="text-align:right;">
-
-0.0062657
-
-</td>
-
-<td style="text-align:right;">
-
-0.0046887
-
-</td>
-
-<td style="text-align:right;">
-
-0.0551410
-
-</td>
-
-<td style="text-align:right;">
-
-0.0211946
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-19
-
-</td>
-
-<td style="text-align:right;">
-
-0.0037593
-
-</td>
-
-<td style="text-align:right;">
-
-0.0030696
-
-</td>
-
-<td style="text-align:right;">
-
-0.0551410
-
-</td>
-
-<td style="text-align:right;">
-
-0.0211946
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-20
-
-</td>
-
-<td style="text-align:right;">
-
-0.0012530
-
-</td>
-
-<td style="text-align:right;">
-
-0.0017720
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526157
-
-</td>
-
-<td style="text-align:right;">
-
-0.0242366
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-21
-
-</td>
-
-<td style="text-align:right;">
-
-0.0012530
-
-</td>
-
-<td style="text-align:right;">
-
-0.0017720
-
-</td>
-
-<td style="text-align:right;">
-
-0.0551410
-
-</td>
-
-<td style="text-align:right;">
-
-0.0211946
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-22
-
-</td>
-
-<td style="text-align:right;">
-
-0.0012530
-
-</td>
-
-<td style="text-align:right;">
-
-0.0017720
-
-</td>
-
-<td style="text-align:right;">
-
-0.0551410
-
-</td>
-
-<td style="text-align:right;">
-
-0.0211946
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-23
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0551410
-
-</td>
-
-<td style="text-align:right;">
-
-0.0211946
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-24
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0551410
-
-</td>
-
-<td style="text-align:right;">
-
-0.0211946
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-25
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0577040
-
-</td>
-
-<td style="text-align:right;">
-
-0.0151420
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-26
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0577040
-
-</td>
-
-<td style="text-align:right;">
-
-0.0195533
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-27
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0577040
-
-</td>
-
-<td style="text-align:right;">
-
-0.0195533
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-28
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0577040
-
-</td>
-
-<td style="text-align:right;">
-
-0.0195533
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-29
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0601917
-
-</td>
-
-<td style="text-align:right;">
-
-0.0218839
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-30
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0577040
-
-</td>
-
-<td style="text-align:right;">
-
-0.0195533
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-31
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0551787
-
-</td>
-
-<td style="text-align:right;">
-
-0.0230972
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-32
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526910
-
-</td>
-
-<td style="text-align:right;">
-
-0.0211918
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-33
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0602293
-
-</td>
-
-<td style="text-align:right;">
-
-0.0160216
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-34
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526910
-
-</td>
-
-<td style="text-align:right;">
-
-0.0211918
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-35
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526910
-
-</td>
-
-<td style="text-align:right;">
-
-0.0211918
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-36
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526910
-
-</td>
-
-<td style="text-align:right;">
-
-0.0211918
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-37
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526533
-
-</td>
-
-<td style="text-align:right;">
-
-0.0219216
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-38
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0552163
-
-</td>
-
-<td style="text-align:right;">
-
-0.0176213
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-39
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0552163
-
-</td>
-
-<td style="text-align:right;">
-
-0.0176213
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-40
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526533
-
-</td>
-
-<td style="text-align:right;">
-
-0.0219216
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-41
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526910
-
-</td>
-
-<td style="text-align:right;">
-
-0.0160555
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-42
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0552163
-
-</td>
-
-<td style="text-align:right;">
-
-0.0125483
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-43
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0577040
-
-</td>
-
-<td style="text-align:right;">
-
-0.0151420
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-44
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526910
-
-</td>
-
-<td style="text-align:right;">
-
-0.0160555
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-45
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0551787
-
-</td>
-
-<td style="text-align:right;">
-
-0.0184977
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-46
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526910
-
-</td>
-
-<td style="text-align:right;">
-
-0.0160555
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-47
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0526910
-
-</td>
-
-<td style="text-align:right;">
-
-0.0160555
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-48
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0501657
-
-</td>
-
-<td style="text-align:right;">
-
-0.0151841
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-49
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0501657
-
-</td>
-
-<td style="text-align:right;">
-
-0.0151841
-
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-50
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0000000
-
-</td>
-
-<td style="text-align:right;">
-
-0.0501657
-
-</td>
-
-<td style="text-align:right;">
-
-0.0151841
-
-</td>
-
-</tr>
-
-</tbody>
-
-</table>
-
-Increasing cut of increases the precision. A greater fraction of those
-who will be predicted that they have cancer will turn out that they
-have, but the algorithm is likely to have lower recall. If we want to
-avoid too many cases of people cancer being predicted that they do not
-have cancer. It will be very bad to tell someone that they do not have
-cancer but they have. If we lower the probability let say to 0.3 then we
-want to make sure that even if there is a 30% chance you have cancer
-then you should be flagged.
-
-``` r
-bst2 <- xgboost(data = trainx, label = y, 
-                max_depth = 2, eta = .4, nthread = 4, nrounds = 50, 
-                objective = "binary:logistic", verbose = FALSE)
+#mean(pred_svm == ytest)
 ```
 
 ``` r
-predxgbooost <- ifelse(predict(bst2, testx)> 0.7, 1, 0)
+pred_svm <- ifelse(pred_svm[, "M"] > 0.4, "M", "B")
 
-mean(ytest == predxgbooost)
-```
-
-    ## [1] 0.9766082
-
-``` r
-roc(ytest, predxgbooost, print.auc=T, print.auc.y=0.5, levels =0:1 ) 
-```
-
-    ## 
-    ## Call:
-    ## roc.default(response = ytest, predictor = predxgbooost, levels = 0:1,     print.auc = T, print.auc.y = 0.5)
-    ## 
-    ## Data: predxgbooost in 111 controls (ytest 0) < 60 cases (ytest 1).
-    ## Area under the curve: 0.9667
-
-``` r
-table(ytest, predxgbooost) %>% confusionMatrix(positive = "1") %>% tidy() %>% 
-    kable()
+pred_svm <- factor(pred_svm, levels = levels(test$label))
+table(test$label, pred_svm)  %>% 
+  confusionMatrix(positive = "M") %>%
+  tidy()%>%
+  kable()
 ```
 
 <table>
@@ -10075,7 +8024,7 @@ NA
 
 <td style="text-align:right;">
 
-0.0000000
+0
 
 </td>
 
@@ -10097,7 +8046,7 @@ NA
 
 <td style="text-align:right;">
 
-0.9478500
+0.9486486
 
 </td>
 
@@ -10115,7 +8064,7 @@ NA
 
 <td style="text-align:right;">
 
-0.1336144
+1
 
 </td>
 
@@ -10131,13 +8080,13 @@ sensitivity
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-1.0000000
+0.9666667
 
 </td>
 
@@ -10171,13 +8120,13 @@ specificity
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.9652174
+0.9819820
 
 </td>
 
@@ -10211,13 +8160,13 @@ pos\_pred\_value
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.9333333
+0.9666667
 
 </td>
 
@@ -10251,13 +8200,13 @@ neg\_pred\_value
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-1.0000000
+0.9819820
 
 </td>
 
@@ -10291,13 +8240,13 @@ precision
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.9333333
+0.9666667
 
 </td>
 
@@ -10331,13 +8280,13 @@ recall
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-1.0000000
+0.9666667
 
 </td>
 
@@ -10371,13 +8320,13 @@ f1
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.9655172
+0.9666667
 
 </td>
 
@@ -10411,13 +8360,13 @@ prevalence
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.3274854
+0.3508772
 
 </td>
 
@@ -10451,13 +8400,13 @@ detection\_rate
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.3274854
+0.3391813
 
 </td>
 
@@ -10491,7 +8440,7 @@ detection\_prevalence
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
@@ -10531,13 +8480,13 @@ balanced\_accuracy
 
 <td style="text-align:left;">
 
-1
+M
 
 </td>
 
 <td style="text-align:right;">
 
-0.9826087
+0.9743243
 
 </td>
 
@@ -10565,9 +8514,123 @@ NA
 
 </table>
 
+## ***Xgboost***
+
+XGBoost is a type of an ensemble learner. Ensemble learning is where
+multiple machine learning algorithms are used at the same time for
+prediction. A good example will be Random Forests. In random Forest
+multiple decision trees are used together for prediction. There are two
+main types of ensemble learners, bagging and boosting. Random forest use
+the bagging approach. Trees are built from random subsets(rows and
+columns) of training set and then the final prediction is the weighted
+sum of all decision trees functions. Boosting methods are similar but in
+boosting samples are selected sequentially. For instance the first
+sample is selected and a decision tree is fitted, The model then picks
+the examples that were hard to learn and using this examples and a few
+others selected randomly from the training set the second model is
+fitted, Using the first model and the second model prediction is made,
+the model is evaluated and hard examples are picked and together with
+another randomly selected new examples from training set another model
+is trained. This is the process for boosting algorithms which continues
+for a specified number of n.
+
+In gradient boosting the first model is fitted to the original training
+set. Let say your fitting a simple regression model for ease of
+explanation. Then your first model will be
+\(latex y = f(x) + \epsilon\). When you find that the error is too large
+one of the things you might try to do is add more features, use another
+algorithm, tune your algorithm, look for more training data etc. But
+what if the error is not white noise and it has some relationship with
+output \(y\) . Then we can fit a second model.
+\(latex \epsilon = f_1(x) + \epsilon_1\). then this process can continue
+lets say until n times. Then the final model will be
+
+\(latex \epsilon_n = f_{n}(x) + \epsilon_{n-1}\).
+
+Then the final step is to add this models together with some weighting
+criteria \(latex weights = \alpha 's\) which gives us the final function
+used for prediction.
+
+\(y =latex \alpha * f(x) + \alpha_1 * f_1(x) + \alpha_2 * f_2(x)...+ \alpha_n * f_n + \epsilon\)
+
 ``` r
-table(ytest, predxgbooost)  %>% 
-    kable() 
+# "subsample" is the fraction of the training samples (randomly selected) that will be used to train each tree.
+# "colsample_by_tree" is the fraction of features (randomly selected) that will be used to train each tree.
+# "colsample_bylevel" is the fraction of features (randomly selected) that will be used in each node to train each tree.
+
+
+
+xgb_ctrl <- trainControl(method = "cv",
+                        number = 5,
+                        summaryFunction = twoClassSummary,
+                        classProbs = TRUE,
+                        allowParallel=T,
+                        index = cv_fold,
+                        verboseIter = FALSE,
+                        savePredictions = TRUE,
+                        search = "grid")
+
+xgb_grid <- expand.grid(nrounds = c(10, 50, 100),
+                        eta = c(0.01,0.05,0.1),
+                        max_depth = c(10, 50, 80),
+                        gamma = c(0, 1, 5),
+                        colsample_bytree = seq(0.6, .9, length.out = 3),
+                        min_child_weight = c(.8, .90, .95),
+                        subsample =  c(.5, .7, .8)
+                        
+    )
+
+    
+xgb_model <-train(label~.,
+                 data=train,
+                 method="xgbTree",
+                 trControl= xgb_ctrl,
+                 tuneGrid=xgb_grid,
+                 verbose=T,
+                 metric="ROC",
+                 nthread =3
+                     
+    )
+```
+
+Increasing cut of increases the precision. A greater fraction of those
+who will be predicted that they have cancer will turn out that they
+have, but the algorithm is likely to have lower recall. If we want to
+avoid too many cases of people cancer being predicted that they do not
+have cancer. It will be very bad to tell someone that they do not have
+cancer but they have. If we lower the probability let say to 0.3 then we
+want to make sure that even if there is a 30% chance you have cancer
+then you should be flagged.
+
+``` r
+resample_xgb <- thresholder(xgb_model, 
+                              threshold = seq(.0, 1, by = 0.01), 
+                              final = TRUE, 
+                              statistics = "all")
+
+ggplot(resample_xgb , aes(x = prob_threshold, y = F1, col = "F1")) + 
+  geom_point() + 
+  geom_point(aes(y = Sensitivity, col = "Sensitivity"))+
+  scale_x_continuous(breaks = seq(0, 1, by =.1))
+```
+
+![](cancer-data_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
+
+``` r
+pred_xgb <-predict(xgb_model, newdata = test, type = "prob")
+```
+
+``` r
+pred_xgb <- predict(xgb_model, newdata = test, type = "prob")
+```
+
+``` r
+pred_xgb1 <- ifelse(pred_xgb[, "M"] > 0.4, "M", "B")
+pred_xgb1 <- factor(pred_xgb1, levels = levels(test$label))
+table(test$label, pred_xgb1 ) %>%
+  confusionMatrix(positive = "M") %>%
+  tidy() %>% 
+  kable()
 ```
 
 <table>
@@ -10578,17 +8641,37 @@ table(ytest, predxgbooost)  %>%
 
 <th style="text-align:left;">
 
+term
+
+</th>
+
+<th style="text-align:left;">
+
+class
+
 </th>
 
 <th style="text-align:right;">
 
-0
+estimate
 
 </th>
 
 <th style="text-align:right;">
 
-1
+conf.low
+
+</th>
+
+<th style="text-align:right;">
+
+conf.high
+
+</th>
+
+<th style="text-align:right;">
+
+p.value
 
 </th>
 
@@ -10602,19 +8685,37 @@ table(ytest, predxgbooost)  %>%
 
 <td style="text-align:left;">
 
-0
+accuracy
+
+</td>
+
+<td style="text-align:left;">
+
+NA
 
 </td>
 
 <td style="text-align:right;">
 
-111
+0.9590643
 
 </td>
 
 <td style="text-align:right;">
 
-0
+0.9174782
+
+</td>
+
+<td style="text-align:right;">
+
+0.9833858
+
+</td>
+
+<td style="text-align:right;">
+
+0.0000000
 
 </td>
 
@@ -10624,19 +8725,477 @@ table(ytest, predxgbooost)  %>%
 
 <td style="text-align:left;">
 
-1
+kappa
+
+</td>
+
+<td style="text-align:left;">
+
+NA
 
 </td>
 
 <td style="text-align:right;">
 
-4
+0.9111556
 
 </td>
 
 <td style="text-align:right;">
 
-56
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+0.4496918
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+sensitivity
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.9206349
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+specificity
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.9814815
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+pos\_pred\_value
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.9666667
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+neg\_pred\_value
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.9549550
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+precision
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.9666667
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+recall
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.9206349
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+f1
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.9430894
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+prevalence
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.3684211
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+detection\_rate
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.3391813
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+detection\_prevalence
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.3508772
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+balanced\_accuracy
+
+</td>
+
+<td style="text-align:left;">
+
+M
+
+</td>
+
+<td style="text-align:right;">
+
+0.9510582
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
+
+</td>
+
+<td style="text-align:right;">
+
+NA
 
 </td>
 
@@ -10646,25 +9205,28 @@ table(ytest, predxgbooost)  %>%
 
 </table>
 
-## ***Validation Curves***
+## ***Learning Curves***
 
 ``` r
-sets <- seq(from = 50, to = nrow(trainx), by = 50)
-sets[length(sets)] <-nrow(trainx) 
+sets <- seq(from = 50, to = nrow(train), by = 50)
+sets[length(sets)] <-nrow(train) 
 train.err <- c()
 test.err<- c()
 for (i in 1:length(sets)) {
     
-    traini = trainx[1:sets[i],]
-    yi = y[1:sets[i]]
-    fit_svm <- svm(x = traini, y = yi, cost =10 , gamma = .01, 
-               kernel = "radial", type ="C-classification")
-
+    traini = train[1:sets[i],]
+    fit_svm <- train(label ~., data = traini, metric="Accuracy", method = "svmRadial", 
+                 trControl = trainControl(method = "none", summaryFunction = twoClassSummary,
+                                          classProbs = TRUE),
+                 tuneGrid = expand_grid(sigma = 0.01, C = 5),
+                 )
     
-    pred_train = predict(fit_svm, newdata = traini)
-    train.err[i] =1 -  mean(pred_train == yi)
-    pred_test <- predict(fit_svm, newdata = testx)
-    test.err[i] = 1 - mean(ytest == pred_test)
+    pred_train = predict(fit_svm, newdata = traini, type = "prob")
+    pred_train = ifelse(pred_train[["M"]] > 0.4, "M", "B")
+    train.err[i] =1 -  mean(pred_train == traini$label)
+    pred_test = predict(fit_svm, newdata = test, type = 'prob')
+    pred_test = ifelse(pred_test[, "M"] > 0.4, "M", "B")
+    test.err[i] = 1 - mean(test$label == pred_test)
     
     cat(i," ")
     
@@ -10677,15 +9239,16 @@ for (i in 1:length(sets)) {
 train.err
 ```
 
-    ## [1] 0.00000000 0.02000000 0.01333333 0.01500000 0.02000000 0.01333333 0.02010050
+    ## [1] 0.00000000 0.03000000 0.02666667 0.00500000 0.02000000 0.01333333
+    ## [7] 0.02763819
 
 ``` r
 matplot(sets, cbind(test.err, train.err), pch = 19, col = c("red", "blue"),
-        type = "b", ylab = "Error", xlab = "Train sample size", main = "SVM Training and Validation errors")
+        type = "b", ylab = "Error", xlab = "Train sample size", main = "SVM Learning Curves")
 legend("topright", legend = c("Test", "Train"), pch = 19, col = c("red", "blue"))
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-37-1.png)<!-- -->
+![](cancer-data_files/figure-gfm/unnamed-chunk-31-1.png)<!-- -->
 
 ## ***Error Analysis***
 
@@ -10697,19 +9260,19 @@ misclassified had lower radius mean compared to mislassified benign
 tumors. This contrary to what we saw in the first boxplots graph.
 
 ``` r
-df = data.frame(cancer[-train_sample,], pred_svm, predxgbooost) %>%
+df <- data.frame(cancer[-train_sample,], pred_svm) %>%
     setDT()
 
 
-test_mis_svm <- df[diagnosis== "M" & pred_svm == 0 | diagnosis == "B" & pred_svm == 1]
+test_mis_svm <- df[(diagnosis == "M" & pred_svm == 0) |( diagnosis == "B" & pred_svm == "M")]
 ```
 
 ``` r
 test_mis_svm_m <- melt(test_mis_svm, 
-                id.vars = c("diagnosis", "pred_svm", "predxgbooost"))
+                id.vars = c("diagnosis", "pred_svm"))
 
 ggplot(test_mis_svm_m , aes(x = pred_svm, y = value))+
     geom_boxplot() + facet_wrap(~variable, scales = "free_y")
 ```
 
-![](cancer-data_files/figure-gfm/unnamed-chunk-39-1.png)<!-- -->
+![](cancer-data_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
